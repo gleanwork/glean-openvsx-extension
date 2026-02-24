@@ -1,0 +1,52 @@
+{
+  "name": "glean-mcp",
+  "displayName": "Glean MCP",
+  "description": "Automatically connects Cursor to your organization's Glean MCP server via MDM-managed configuration",
+  "version": "0.0.1",
+  "publisher": "glean",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AskScio/mdm-extension"
+  },
+  "icon": "icon.png",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Glean MCP",
+      "properties": {
+        "gleanMcp.serverName": {
+          "type": "string",
+          "description": "Display name for the Glean MCP server",
+          "default": "glean"
+        },
+        "gleanMcp.serverUrl": {
+          "type": "string",
+          "description": "URL of the Glean MCP server (e.g. https://company-be.glean.com/mcp/default)",
+          "default": ""
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package --out glean-mcp.vsix"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/vscode": "^1.93.0",
+    "@vscode/vsce": "^3.2.2",
+    "typescript": "^5.7.0"
+  }
+}
