@@ -1,6 +1,6 @@
 #
 # MDM install script for Windows.
-# Installs the Glean MCP extension into Cursor and deploys the config file.
+# Installs the Glean MDM extension into Cursor and deploys the config file.
 #
 # Usage: install-windows.ps1 -GleanMcpUrl <url> [-ServerName <name>]
 #
@@ -11,13 +11,13 @@ param(
     [string]$GleanMcpUrl,
 
     [Parameter(Mandatory=$false)]
-    [string]$ServerName = "glean_default"
+    [string]$ServerName = "glean_default_mdm"
 )
 
 $ErrorActionPreference = "Stop"
 
-$VsixDownloadUrl = "https://github.com/gleanwork/glean-extension-mdm/releases/latest/download/glean-mcp.vsix"
-$VsixPath = Join-Path $env:TEMP "glean-mcp.vsix"
+$VsixDownloadUrl = "https://github.com/gleanwork/glean-extension-mdm/releases/latest/download/glean-mdm.vsix"
+$VsixPath = Join-Path $env:TEMP "glean-mdm.vsix"
 $ConfigDir = Join-Path $env:ProgramData "Glean MDM"
 $ConfigPath = Join-Path $ConfigDir "mcp-config.json"
 

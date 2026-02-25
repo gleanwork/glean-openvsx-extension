@@ -33,7 +33,7 @@ declare module "vscode" {
   }
 }
 
-export interface GleanMcpConfig {
+export interface GleanMdmConfig {
   serverName: string;
   url: string;
 }

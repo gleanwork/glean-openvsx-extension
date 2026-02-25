@@ -8,12 +8,12 @@ let registeredServerName: string | null = null;
 let configWatcher: fs.FSWatcher | null = null;
 
 export function activate(context: vscode.ExtensionContext) {
-  log.info("Glean MCP extension activating");
+  log.info("Glean MDM extension activating");
 
   if (!hasCursorMcpApi()) {
     log.warn("Cursor MCP extension API not available");
     vscode.window.showWarningMessage(
-      "Glean MCP: This version of Cursor does not support the MCP extension API. Please update Cursor."
+      "Glean MDM: This version of Cursor does not support the MCP extension API. Please update Cursor."
     );
     return;
   }
@@ -29,7 +29,7 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
-  log.info("Glean MCP extension deactivating");
+  log.info("Glean MDM extension deactivating");
   cleanup();
 }
 
@@ -40,7 +40,7 @@ function hasCursorMcpApi(): boolean {
 async function registerFromConfig() {
   const config = resolveConfig();
   if (!config) {
-    log.warn("No Glean MCP config found (checked MDM file, env vars, and settings)");
+    log.warn("No Glean MDM config found (checked MDM file, env vars, and settings)");
     return;
   }
 

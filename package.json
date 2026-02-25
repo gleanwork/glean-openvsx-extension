@@ -1,7 +1,7 @@
 {
-  "name": "glean-mcp",
-  "displayName": "Glean MCP",
-  "description": "Automatically connects Cursor to your organization's Glean MCP server via MDM-managed configuration",
+  "name": "glean-mdm",
+  "displayName": "Glean MDM",
+  "description": "Automatically connects Cursor to your organization's Glean MDM server via MDM-managed configuration",
   "version": "0.0.2",
   "publisher": "glean",
   "license": "MIT",
@@ -22,16 +22,16 @@
   "main": "./out/extension.js",
   "contributes": {
     "configuration": {
-      "title": "Glean MCP",
+      "title": "Glean MDM",
       "properties": {
-        "gleanMcp.serverName": {
+        "gleanMdm.serverName": {
           "type": "string",
-          "description": "Display name for the Glean MCP server",
+          "description": "Display name for the Glean MDM server",
           "default": "glean"
         },
-        "gleanMcp.serverUrl": {
+        "gleanMdm.serverUrl": {
           "type": "string",
-          "description": "URL of the Glean MCP server (e.g. https://company-be.glean.com/mcp/default)",
+          "description": "URL of the Glean MDM server (e.g. https://company-be.glean.com/mcp/default)",
           "default": ""
         }
       }
@@ -41,12 +41,14 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package --out glean-mcp.vsix"
+    "package": "vsce package --out glean-mdm.vsix",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@types/node": "^22",
     "@types/vscode": "^1.93.0",
     "@vscode/vsce": "^3.2.2",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18"
   }
 }

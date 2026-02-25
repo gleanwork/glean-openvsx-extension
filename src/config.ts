@@ -2,9 +2,9 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as vscode from "vscode";
-import type { GleanMcpConfig } from "./types";
+import type { GleanMdmConfig } from "./types";
 
-const DEFAULT_SERVER_NAME = "glean_default";
+const DEFAULT_SERVER_NAME = "glean_default_mdm";
 
 /**
  * Platform-specific paths where MDM drops the config file.
@@ -41,7 +41,7 @@ function readJsonFile(filePath: string): Record<string, unknown> | null {
   }
 }
 
-function configFromFile(filePath: string): GleanMcpConfig | null {
+function configFromFile(filePath: string): GleanMdmConfig | null {
   const data = readJsonFile(filePath);
   if (!data || typeof data.url !== "string" || !data.url) {
     return null;
@@ -55,7 +55,7 @@ function configFromFile(filePath: string): GleanMcpConfig | null {
   };
 }
 
-function configFromEnv(): GleanMcpConfig | null {
+function configFromEnv(): GleanMdmConfig | null {
   const url = process.env.GLEAN_MCP_URL;
   if (!url) {
     return null;
@@ -66,8 +66,8 @@ function configFromEnv(): GleanMcpConfig | null {
   };
 }
 
-function configFromSettings(): GleanMcpConfig | null {
-  const settings = vscode.workspace.getConfiguration("gleanMcp");
+function configFromSettings(): GleanMdmConfig | null {
+  const settings = vscode.workspace.getConfiguration("gleanMdm");
   const url = settings.get<string>("serverUrl");
   if (!url) {
     return null;
@@ -79,13 +79,13 @@ function configFromSettings(): GleanMcpConfig | null {
 }
 
 /**
- * Resolve Glean MCP config using this priority:
+ * Resolve Glean MDM config using this priority:
  * 1. System-level config file (MDM-managed)
- * 2. User-level config file (~/.glean/mcp-config.json)
+ * 2. User-level config file (~/.glean_mdm/mcp-config.json)
  * 3. Environment variables (GLEAN_MCP_URL, GLEAN_MCP_SERVER_NAME)
- * 4. VS Code / Cursor settings (gleanMcp.serverUrl, gleanMcp.serverName)
+ * 4. VS Code / Cursor settings (gleanMdm.serverUrl, gleanMdm.serverName)
  */
-export function resolveConfig(): GleanMcpConfig | null {
+export function resolveConfig(): GleanMdmConfig | null {
   const systemPath = getSystemConfigPath();
   const systemConfig = configFromFile(systemPath);
   if (systemConfig) {

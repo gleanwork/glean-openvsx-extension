@@ -1,4 +1,4 @@
-# Glean MCP — MDM
+# Glean MDM
 
 Automatically connects Cursor to your organization's Glean MCP server, giving you access to Glean's AI-powered search and knowledge tools directly in Cursor.
 

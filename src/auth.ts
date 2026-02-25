@@ -50,7 +50,7 @@ function getMcpLease(): any | null {
 }
 
 function toLeaseClientKey(serverName: string): string {
-  return `user-glean.glean-mcp-extension-${serverName}`;
+  return `user-glean.glean-mdm-extension-${serverName}`;
 }
 
 async function checkAuthAndPrompt(lease: any, serverName: string | null): Promise<void> {
