@@ -11,14 +11,14 @@ param(
     [string]$GleanMcpUrl,
 
     [Parameter(Mandatory=$false)]
-    [string]$ServerName = "glean"
+    [string]$ServerName = "glean_default"
 )
 
 $ErrorActionPreference = "Stop"
 
 $VsixDownloadUrl = "https://github.com/travis-hoover-glean/glean-mcp-mdm/releases/latest/download/glean-mcp.vsix"
 $VsixPath = Join-Path $env:TEMP "glean-mcp.vsix"
-$ConfigDir = Join-Path $env:ProgramData "Glean"
+$ConfigDir = Join-Path $env:ProgramData "Glean MDM"
 $ConfigPath = Join-Path $ConfigDir "mcp-config.json"
 
 # Deploy config file
