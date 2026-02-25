@@ -1,4 +1,4 @@
-# Glean MCP — Cursor Extension for MDM
+# Glean MDM
 
 A Cursor extension that automatically connects the Glean MCP server when Cursor launches. Designed for enterprise MDM (Mobile Device Management) deployment.
 
@@ -35,7 +35,7 @@ A user-level config at `~/.glean/mcp-config.json` is also supported for developm
 1. System config file (MDM-managed, paths above)
 2. User config file (`~/.glean/mcp-config.json`)
 3. Environment variables: `GLEAN_MCP_URL`, `GLEAN_MCP_SERVER_NAME`
-4. Cursor settings: `gleanMcp.serverUrl`, `gleanMcp.serverName`
+4. Cursor settings: `gleanMdm.serverUrl`, `gleanMdm.serverName`
 
 ## MDM deployment
 
@@ -66,5 +66,5 @@ npm run compile
 
 ```bash
 npm run package
-# Produces glean-mcp.vsix
+# Produces glean-mdm.vsix
 ```

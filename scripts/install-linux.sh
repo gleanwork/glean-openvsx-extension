@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # MDM install script for Linux.
-# Installs the Glean MCP extension into Cursor and deploys the config file.
+# Installs the Glean MDM extension into Cursor and deploys the config file.
 #
 # Usage: install-linux.sh <glean_mcp_url> [server_name]
 #
@@ -9,13 +9,13 @@
 
 set -euo pipefail
 
-VSIX_DOWNLOAD_URL="https://github.com/gleanwork/glean-extension-mdm/releases/latest/download/glean-mcp.vsix"
-VSIX_PATH="/tmp/glean-mcp.vsix"
+VSIX_DOWNLOAD_URL="https://github.com/gleanwork/glean-extension-mdm/releases/latest/download/glean-mdm.vsix"
+VSIX_PATH="/tmp/glean-mdm.vsix"
 CONFIG_DIR="/etc/glean_mdm"
 CONFIG_PATH="${CONFIG_DIR}/mcp-config.json"
 
 GLEAN_MCP_URL="${1:-}"
-SERVER_NAME="${2:-glean_default}"
+SERVER_NAME="${2:-glean_default_mdm}"
 
 if [ -z "$GLEAN_MCP_URL" ]; then
   echo "Error: Glean MCP URL is required as the first argument."

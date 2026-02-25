@@ -29,7 +29,7 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            glean-mcp.vsix
+            glean-mdm.vsix
             scripts/install-macos.sh
             scripts/install-linux.sh
             scripts/install-windows.ps1
