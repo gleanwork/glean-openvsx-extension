@@ -1,6 +1,6 @@
 #
 # MDM install script for Windows.
-# Installs the Glean MDM extension into Cursor and deploys the config file.
+# Installs the Glean extension into Cursor and deploys the config file.
 #
 # Usage: install-windows.ps1 -GleanMcpUrl <url> [-ServerName <name>]
 #
@@ -11,13 +11,13 @@ param(
     [string]$GleanMcpUrl,
 
     [Parameter(Mandatory=$false)]
-    [string]$ServerName = "glean_default_mdm"
+    [string]$ServerName = "glean-default"
 )
 
 $ErrorActionPreference = "Stop"
 
-$VsixDownloadUrl = "https://github.com/gleanwork/glean-extension-mdm/releases/latest/download/glean-mdm.vsix"
-$VsixPath = Join-Path $env:TEMP "glean-mdm.vsix"
+$VsixDownloadUrl = "https://github.com/gleanwork/glean-extension-mdm/releases/latest/download/glean.vsix"
+$VsixPath = Join-Path $env:TEMP "gleanvsix"
 $ConfigDir = Join-Path $env:ProgramData "Glean MDM"
 $ConfigPath = Join-Path $ConfigDir "mcp-config.json"
 
@@ -70,10 +70,44 @@ if (-not $cursorCmd) {
 
 Write-Host "Found cursor CLI at: $cursorCmd"
 
+$targetUser = (Get-WmiObject -Class Win32_ComputerSystem).UserName
+if ($targetUser -match '\\') {
+    $targetUser = $targetUser.Split('\')[-1]
+}
+
+if (-not $targetUser) {
+    Write-Error "Could not determine a logged-in target user."
+    exit 1
+}
+
+$targetHome = (Get-CimInstance Win32_UserProfile | Where-Object {
+    $_.LocalPath -like "*\$targetUser"
+}).LocalPath
+
+if (-not $targetHome) {
+    Write-Error "Could not determine home directory for user: $targetUser"
+    exit 1
+}
+
+Write-Host "Target user: $targetUser"
+Write-Host "Target home: $targetHome"
+
+# Remove any previous installation to avoid conflicts on reinstall
+$extPattern = Join-Path $targetHome ".cursor\extensions\glean.glean-mdm-*"
+Remove-Item -Path $extPattern -Recurse -Force -ErrorAction SilentlyContinue
+& $cursorCmd --uninstall-extension glean.glean-mdm 2>$null | Out-Null
+
 Write-Host "Downloading extension from $VsixDownloadUrl..."
 try {
     Invoke-WebRequest -Uri $VsixDownloadUrl -OutFile $VsixPath -UseBasicParsing
-    & $cursorCmd --install-extension $VsixPath
+
+    $extDir = Join-Path $targetHome ".cursor\extensions"
+    Write-Host "Installing extension as $targetUser..."
+    & $cursorCmd --install-extension $VsixPath --extensions-dir $extDir
+
+    # Ensure the target user owns the installed files
+    icacls $extDir /grant "${targetUser}:(OI)(CI)F" /T /Q 2>$null | Out-Null
+
     Remove-Item -Path $VsixPath -Force -ErrorAction SilentlyContinue
     Write-Host "Extension installed successfully."
 } catch {

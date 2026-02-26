@@ -1,7 +1,7 @@
 {
-  "name": "glean-mdm",
-  "displayName": "Glean MDM",
-  "description": "Automatically connects Cursor to your organization's Glean MDM server via MDM-managed configuration",
+  "name": "glean",
+  "displayName": "Glean",
+  "description": "Automatically connects Cursor to your organization's Glean MCP server",
   "version": "0.0.5",
   "publisher": "glean",
   "license": "MIT",
@@ -25,7 +25,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package --out glean-mdm.vsix",
+    "package": "vsce package --out glean.vsix",
     "test": "vitest run"
   },
   "devDependencies": {

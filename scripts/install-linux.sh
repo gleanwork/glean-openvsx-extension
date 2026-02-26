@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # MDM install script for Linux.
-# Installs the Glean MDM extension into Cursor and deploys the config file.
+# Installs the Glean extension into Cursor and deploys the config file.
 #
 # Usage: install-linux.sh <glean_mcp_url> [server_name]
 #
@@ -9,13 +9,13 @@
 
 set -euo pipefail
 
-VSIX_DOWNLOAD_URL="https://github.com/gleanwork/glean-extension-mdm/releases/latest/download/glean-mdm.vsix"
-VSIX_PATH="/tmp/glean-mdm.vsix"
+VSIX_DOWNLOAD_URL="https://github.com/gleanwork/glean-extension-mdm/releases/latest/download/glean.vsix"
+VSIX_PATH="/tmp/glean.vsix"
 CONFIG_DIR="/etc/glean_mdm"
 CONFIG_PATH="${CONFIG_DIR}/mcp-config.json"
 
 GLEAN_MCP_URL="${1:-}"
-SERVER_NAME="${2:-glean_default_mdm}"
+SERVER_NAME="${2:-glean-default}"
 
 if [ -z "$GLEAN_MCP_URL" ]; then
   echo "Error: Glean MCP URL is required as the first argument."
@@ -68,10 +68,31 @@ CURSOR_CMD=$(find_cursor_cli) || {
 
 echo "Found cursor CLI at: ${CURSOR_CMD}"
 
+TARGET_USER="$(logname 2>/dev/null || echo "$USER")"
+
+echo "Target user: ${TARGET_USER}"
+
+if [ "$TARGET_USER" = "root" ] || [ -z "$TARGET_USER" ]; then
+  echo "Error: Could not determine a non-root target user."
+  exit 1
+fi
+
+TARGET_HOME=$(eval echo "~${TARGET_USER}")
+
+echo "Target home: ${TARGET_HOME}"
+
+# Remove any previous installation to avoid ownership conflicts on reinstall
+rm -rf "${TARGET_HOME}/.cursor/extensions/glean.glean-mdm-"*
+sudo -H -u "$TARGET_USER" "$CURSOR_CMD" --uninstall-extension glean.glean-mdm 2>/dev/null || true
+
 echo "Downloading extension from ${VSIX_DOWNLOAD_URL}..."
+
 if curl -fsSL -o "$VSIX_PATH" "$VSIX_DOWNLOAD_URL"; then
-  "$CURSOR_CMD" --install-extension "$VSIX_PATH"
+  echo "Installing extension as ${TARGET_USER}..."
+
+  sudo -H -u "$TARGET_USER" "$CURSOR_CMD" --install-extension "$VSIX_PATH"
   rm -f "$VSIX_PATH"
+
   echo "Extension installed successfully."
 else
   echo "Error: Failed to download extension from ${VSIX_DOWNLOAD_URL}"
