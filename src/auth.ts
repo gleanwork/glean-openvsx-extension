@@ -7,6 +7,9 @@ const MIN_UNFOCUSED_MS = 60 * 1000; // 1 minute
 let signInInterval: ReturnType<typeof setInterval> | null = null;
 let lastUnfocusedAt: number = performance.now();
 
+const signInMessage = "Search your company's knowledge without leaving your editor. Find docs, examples, and answers right where you work.";
+const signInButton = "Sign in to Glean";
+
 /**
  * Watches the auth state of an MCP server by accessing the cursor-mcp
  * extension's exported lease API. The getClientKey callback returns the
@@ -157,11 +160,11 @@ function stopSignInReminder() {
 
 async function promptSignIn() {
   const action = await vscode.window.showErrorMessage(
-    "Glean MCP requires authentication. Sign in to start using Glean in Cursor.",
-    "Sign in"
+    signInMessage,
+    signInButton
   );
   
-  if (action === "Sign in") {
+  if (action === signInButton) {
     await vscode.commands.executeCommand("aiSettings.action.open.mcp");
   }
 }

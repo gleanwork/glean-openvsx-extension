@@ -1,11 +1,11 @@
-# Glean MDM
+# Glean
 
-Automatically connects Cursor to your organization's Glean MCP server, giving you access to Glean's AI-powered search and knowledge tools directly in Cursor.
+Brings Glean's AI-powered search and knowledge tools directly into Cursor, so you can find company information without leaving your editor.
 
 ## Setup
 
-Configuration is typically managed by your IT admin via MDM (Mobile Device Management) — no manual setup is needed.
+Your IT admin typically handles setup — no manual configuration needed.
 
 ## Authentication
 
-On first use you will be prompted to sign in to Glean through Cursor's built-in OAuth flow. Once authenticated, the extension works automatically on every launch.
+Sign in to Glean when you first launch Cursor. After that, you will be automatically connected to Glean's MCP server.
