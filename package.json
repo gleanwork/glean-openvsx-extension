@@ -1,7 +1,7 @@
 {
   "name": "glean",
   "displayName": "Glean",
-  "description": "Automatically connects Cursor to your organization's Glean MCP server",
+  "description": "Connect Cursor to your company's knowledge with Glean",
   "version": "0.0.5",
   "publisher": "glean",
   "license": "MIT",
