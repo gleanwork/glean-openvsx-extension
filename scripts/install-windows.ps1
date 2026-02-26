@@ -94,12 +94,6 @@ if (-not $targetHome) {
 
 Write-Host "Target user: $targetUser"
 Write-Host "Target home: $targetHome"
-
-# Remove any previous installation to avoid conflicts on reinstall
-$extPattern = Join-Path $targetHome ".cursor\extensions\glean.glean-*"
-Remove-Item -Path $extPattern -Recurse -Force -ErrorAction SilentlyContinue
-& $cursorCmd --uninstall-extension glean.glean-mdm 2>$null | Out-Null
-
 Write-Host "Downloading extension from $VsixDownloadUrl..."
 try {
     Invoke-WebRequest -Uri $VsixDownloadUrl -OutFile $VsixPath -UseBasicParsing
