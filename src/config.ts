@@ -69,7 +69,6 @@ export function resolveConfig(): GleanMdmConfig | null {
   const userPath = getUserConfigPath();
   return configFromFile(userPath);
 }
-
 /**
  * Returns the path to watch for config file changes.
  * Prefers system config if it exists, else user config.
@@ -87,3 +86,4 @@ export function getWatchablePath(): string | null {
 
   return null;
 }
+
