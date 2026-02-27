@@ -6,7 +6,8 @@ const SIGN_IN_REMINDER_MS = 15 * 60 * 1000; // 15 minutes
 const LEASE_WAIT_TIMEOUT_MS = 60_000;
 let signInInterval: ReturnType<typeof setInterval> | null = null;
 
-const signInMessage = "Search your company's knowledge without leaving your editor. Find docs, examples, and answers right where you work.";
+const signInMessage =
+  "Search your company's knowledge without leaving your editor. Find docs, examples, and answers right where you work.";
 const signInButton = "Sign in to Glean";
 
 const LEASE_POLL_MS = 1_000;
@@ -36,7 +37,9 @@ export function waitForLease(): Promise<any | null> {
         resolve(lease);
       } else if (elapsed >= LEASE_WAIT_TIMEOUT_MS) {
         clearInterval(interval);
-        log.warn(`MCP lease not available after ${LEASE_WAIT_TIMEOUT_MS}ms, giving up`);
+        log.warn(
+          `MCP lease not available after ${LEASE_WAIT_TIMEOUT_MS}ms, giving up`,
+        );
         resolve(null);
       }
     }, LEASE_POLL_MS);
@@ -100,7 +103,10 @@ export async function getLeaseClients(): Promise<McpClientInfo[]> {
   }
 }
 
-export async function checkAuthAndPrompt(lease: any, clientKey: string | null): Promise<void> {
+export async function checkAuthAndPrompt(
+  lease: any,
+  clientKey: string | null,
+): Promise<void> {
   log.info(`Checking auth state for "${clientKey}"`);
   if (!clientKey) {
     return;
@@ -147,11 +153,11 @@ export function stopSignInReminder() {
 }
 
 async function promptSignIn() {
-  const action = await vscode.window.showErrorMessage(
+  const action = await vscode.window.showWarningMessage(
     signInMessage,
-    signInButton
+    signInButton,
   );
-  
+
   if (action === signInButton) {
     await vscode.commands.executeCommand("aiSettings.action.open.mcp");
   }
