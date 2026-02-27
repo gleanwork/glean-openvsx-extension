@@ -3,40 +3,44 @@ import * as log from "./log";
 import type { McpClientInfo } from "./types";
 
 const SIGN_IN_REMINDER_MS = 15 * 60 * 1000; // 15 minutes
+const LEASE_WAIT_TIMEOUT_MS = 60_000;
 let signInInterval: ReturnType<typeof setInterval> | null = null;
 
 const signInMessage = "Search your company's knowledge without leaving your editor. Find docs, examples, and answers right where you work.";
 const signInButton = "Sign in to Glean";
 
+const LEASE_POLL_MS = 1_000;
+
 /**
- * Watches the auth state of an MCP server by accessing the cursor-mcp
- * extension's exported lease API. The getClientKey callback returns the
- * lease client key to monitor -- this may be our own registered server
- * or an existing duplicate we deferred to. Falls back to an unconditional
- * sign-in prompt when the lease API is unavailable.
+ * Polls getMcpLease() every second until it returns non-null.
+ * Returns null if not available within the timeout.
  */
-export function watchAuthState(
-  context: vscode.ExtensionContext,
-  getClientKey: () => string | null,
-) {
-  context.subscriptions.push({ dispose: stopSignInReminder });
-
+export function waitForLease(): Promise<any | null> {
   const lease = getMcpLease();
-  if (!lease || typeof lease.onDidChange !== "function") {
-    log.warn("Cannot watch auth state: lease or onDidChange not available, falling back to sign-in prompt");
-    startSignInReminder();
-    return;
+  if (lease) {
+    log.info("MCP lease available immediately");
+    return Promise.resolve(lease);
   }
 
-  log.info("Watching MCP auth state via lease.onDidChange");
+  log.info("MCP lease not yet available, polling...");
 
-  const disposable = lease.onDidChange(() => {
-    checkAuthAndPrompt(lease, getClientKey());
+  return new Promise((resolve) => {
+    let elapsed = 0;
+
+    const interval = setInterval(() => {
+      elapsed += LEASE_POLL_MS;
+      const lease = getMcpLease();
+      if (lease) {
+        clearInterval(interval);
+        log.info(`MCP lease became available after ${elapsed}ms`);
+        resolve(lease);
+      } else if (elapsed >= LEASE_WAIT_TIMEOUT_MS) {
+        clearInterval(interval);
+        log.warn(`MCP lease not available after ${LEASE_WAIT_TIMEOUT_MS}ms, giving up`);
+        resolve(null);
+      }
+    }, LEASE_POLL_MS);
   });
-
-  if (disposable?.dispose) {
-    context.subscriptions.push(disposable);
-  }
 }
 
 function getMcpLease(): any | null {
@@ -56,7 +60,7 @@ function getMcpLease(): any | null {
 }
 
 export function toLeaseClientKey(serverName: string): string {
-  return `user-glean.glean-mdm-extension-${serverName}`;
+  return `user-glean.glean-extension-${serverName}`;
 }
 
 export async function getLeaseClients(): Promise<McpClientInfo[]> {
@@ -96,7 +100,8 @@ export async function getLeaseClients(): Promise<McpClientInfo[]> {
   }
 }
 
-async function checkAuthAndPrompt(lease: any, clientKey: string | null): Promise<void> {
+export async function checkAuthAndPrompt(lease: any, clientKey: string | null): Promise<void> {
+  log.info(`Checking auth state for "${clientKey}"`);
   if (!clientKey) {
     return;
   }
@@ -105,6 +110,8 @@ async function checkAuthAndPrompt(lease: any, clientKey: string | null): Promise
     const clients = await lease.getClients();
     const client = clients?.[clientKey];
     if (!client || typeof client.getState !== "function") {
+      log.info(`Auth state for "${clientKey}" not found`);
+      startSignInReminder();
       return;
     }
 
@@ -130,7 +137,7 @@ export function startSignInReminder() {
   signInInterval = setInterval(() => promptSignIn(), SIGN_IN_REMINDER_MS);
 }
 
-function stopSignInReminder() {
+export function stopSignInReminder() {
   if (!signInInterval) {
     return;
   }

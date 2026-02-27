@@ -1,15 +1,11 @@
-import * as fs from "fs";
 import * as vscode from "vscode";
-import { watchAuthState, getLeaseClients, toLeaseClientKey, startSignInReminder } from "./auth";
-import { resolveConfig, getWatchablePath } from "./config";
+import { waitForLease, getLeaseClients, toLeaseClientKey, startSignInReminder, stopSignInReminder, checkAuthAndPrompt } from "./auth";
+import { resolveConfig } from "./config";
 import * as log from "./log";
-
-const LEASE_SETTLE_MS = 5_000;
+import type { GleanMdmConfig } from "./types";
 
 let registeredServerName: string | null = null;
 let monitoredClientKey: string | null = null;
-let configWatcher: fs.FSWatcher | null = null;
-let registrationTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function activate(context: vscode.ExtensionContext) {
   log.info("Glean extension activating");
@@ -22,17 +18,18 @@ export function activate(context: vscode.ExtensionContext) {
     return;
   }
 
-  log.info(`Deferring registration by ${LEASE_SETTLE_MS}ms to let other MCP servers populate`);
-  registrationTimer = setTimeout(() => {
-    registrationTimer = null;
-    registerFromConfig();
-  }, LEASE_SETTLE_MS);
+  const config = resolveConfig();
+  if (!config) {
+    log.warn("No Glean MDM config found (checked MDM file, env vars, and settings)");
+    return;
+  }
 
-  startConfigWatcher(context);
-  watchAuthState(context, () => monitoredClientKey);
+  log.info(`Resolved config: serverName=${config.serverName}, url=${config.url}`);
+  initializeWhenReady(context, config);
 
   context.subscriptions.push(
     { dispose: cleanup },
+    { dispose: stopSignInReminder },
     { dispose: () => log.dispose() },
   );
 }
@@ -46,15 +43,29 @@ function hasCursorMcpApi(): boolean {
   return !!(vscode as any).cursor?.mcp?.registerServer;
 }
 
-async function registerFromConfig() {
-  const config = resolveConfig();
-  if (!config) {
-    log.warn("No Glean MDM config found (checked MDM file, env vars, and settings)");
+async function initializeWhenReady(context: vscode.ExtensionContext, config: GleanMdmConfig) {
+  const lease = await waitForLease();
+ 
+  if (!lease) {
+    log.warn("No MCP lease available, disabling Glean MDM");
     return;
   }
 
-  log.info(`Resolved config: serverName=${config.serverName}, url=${config.url}`);
+  await registerServer(config);
+  await checkAuthAndPrompt(lease, monitoredClientKey);
 
+  if (typeof lease.onDidChange === "function") {
+    log.info("Watching MCP auth state via lease.onDidChange");
+    const disposable = lease.onDidChange(() => {
+      checkAuthAndPrompt(lease, monitoredClientKey);
+    });
+    if (disposable?.dispose) {
+      context.subscriptions.push(disposable);
+    }
+  }
+}
+
+async function registerServer(config: GleanMdmConfig) {
   const ownClientKey = toLeaseClientKey(config.serverName);
   const existingClients = await getLeaseClients();
 
@@ -103,42 +114,10 @@ async function registerFromConfig() {
     },
   });
 
-  log.info(`Registered MCP server "${config.serverName}"`);
-}
-
-function startConfigWatcher(context: vscode.ExtensionContext) {
-  const watchPath = getWatchablePath();
-  if (!watchPath) {
-    return;
-  }
-
-  log.info(`Watching config file: ${watchPath}`);
-
-  try {
-    configWatcher = fs.watch(watchPath, { persistent: false }, (eventType) => {
-      if (eventType === "change" || eventType === "rename") {
-        log.info(`Config file ${eventType} detected, re-registering`);
-        registerFromConfig();
-      }
-    });
-
-    context.subscriptions.push({
-      dispose: () => {
-        configWatcher?.close();
-        configWatcher = null;
-      },
-    });
-  } catch (err) {
-    log.error(`Failed to watch config file: ${err}`);
-  }
+  log.info(`Registered MCP server "extension-${config.serverName}"`);
 }
 
 function cleanup() {
-  if (registrationTimer) {
-    clearTimeout(registrationTimer);
-    registrationTimer = null;
-  }
-
   if (registeredServerName) {
     try {
       log.info(`Unregistering MCP server "${registeredServerName}"`);
@@ -148,7 +127,4 @@ function cleanup() {
     }
     registeredServerName = null;
   }
-
-  configWatcher?.close();
-  configWatcher = null;
 }
