@@ -27,7 +27,9 @@ declare module "vscode" {
 
       export type ExtMCPServerConfig = StdioServerConfig | RemoteServerConfig;
 
-      export const registerServer: (config: ExtMCPServerConfig) => Promise<void>;
+      export const registerServer: (
+        config: ExtMCPServerConfig,
+      ) => Promise<void>;
       export const unregisterServer: (serverName: string) => void;
     }
   }
@@ -36,10 +38,4 @@ declare module "vscode" {
 export interface GleanMdmConfig {
   serverName: string;
   url: string;
-}
-
-export interface McpClientInfo {
-  clientKey: string;
-  url: string | undefined;
-  state: string | undefined;
 }

@@ -14,7 +14,10 @@
     "vscode": "^1.93.0"
   },
   "categories": [
-    "Other"
+    "MCP"
+  ],
+  "extensionDependencies": [
+    "anysphere.cursor-mcp"
   ],
   "activationEvents": [
     "onStartupFinished"

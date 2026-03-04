@@ -1,109 +1,201 @@
 import * as vscode from "vscode";
-import { waitForLease, getLeaseClients, toLeaseClientKey, startSignInReminder, stopSignInReminder, checkAuthAndPrompt } from "./auth";
+
 import { resolveConfig } from "./config";
 import * as log from "./log";
 import type { GleanMdmConfig } from "./types";
 
-let registeredServerName: string | null = null;
-let monitoredClientKey: string | null = null;
+const signInMessage =
+  "Search your company's knowledge without leaving your editor. Find docs, examples, and answers right where you work.";
+const signInButton = "Sign in to Glean";
 
-export function activate(context: vscode.ExtensionContext) {
-  log.info("Glean extension activating");
-  log.info(`Cursor version: ${vscode.version}, Extension version: ${context.extension.packageJSON.version}`);
+type McpClientState =
+  | { kind: "ready" }
+  | { kind: "loading" }
+  | { kind: "requires_authentication" };
+
+type McpClientInfo = {
+  key: string;
+  url: string | undefined;
+  state: McpClientState;
+};
+
+interface ExtensionState {
+  lastKnownMcpClients: McpClientInfo[];
+}
+
+let onDidChangeTimeout: NodeJS.Timeout | null = null;
+let leaseHasChanged: boolean = false;
+
+/**
+ * Monitors the MCP client state by subscribing to lease changes and debouncing updates. Anytime a MCP client is added, removed, or its state changes, 
+ * the handleMcpStateChange function is called. If no MCP clients are detected within 10 seconds, automatically registers the Glean MCP server.
+ */
+async function monitorMcpState(
+  context: vscode.ExtensionContext,
+  state: ExtensionState,
+  config: GleanMdmConfig,
+) {
+  const mcpExt = vscode.extensions.getExtension("anysphere.cursor-mcp");
+  const { getMcpLease } = await (mcpExt as any).activate();
+  const lease = getMcpLease();
+
+  log.info(`MCP lease activated`);
+  
+  const DEBOUNCE_DELAY_MS = 1000;
+
+  const leaseOnDidChangeHandle = lease.onDidChange(() => {
+    log.info(`Lease onDidChange called`);
+    leaseHasChanged = true;
+    if (onDidChangeTimeout) {
+      clearTimeout(onDidChangeTimeout);
+    }
+    onDidChangeTimeout = setTimeout(async () => {
+      const clients = await lease.getClients();
+      log.info(`Found: ${Object.keys(clients).length} MCP client(s)`);
+
+      const clientInfos: McpClientInfo[] = [];
+
+      for (const key of Object.keys(clients)) {
+        const clientState = (await clients[key].getState()) as McpClientState;
+        const url = clients[key].config?.url;
+        log.info(`Client: ${key} - ${url} - ${clientState.kind}`);
+        clientInfos.push({
+          key,
+          url,
+          state: clientState,
+        });
+      }
+
+      await handleMcpStateChange(state, clientInfos, config);
+    }, DEBOUNCE_DELAY_MS);
+  });
+
+  // Wait for 10 seconds to see if any MCP clients are found, and if not, register the Glean MCP server
+  // In the case where no MCP clients have been added the lease.onDidChange callback will not be called
+  // so we go ahead and register the Glean MCP server to "manually" kick off the change process.
+  const timeoutHandle = setTimeout(async () => {
+    if (!leaseHasChanged) {
+      log.info(`No initial MCP clients found, registering Glean MCP server`);
+      await registerGleanMcpServer(config);
+    }
+  }, 10_000);
+
+  context.subscriptions.push({
+    dispose: () => clearTimeout(timeoutHandle),
+  });
+  context.subscriptions.push(leaseOnDidChangeHandle);
+}
+
+/**
+ * Handles MCP state changes by determining whether to register, unregister, or prompt
+ * sign-in based on the current set of MCP clients and their states.
+ */
+async function handleMcpStateChange(
+  state: ExtensionState,
+  clients: McpClientInfo[],
+  config: GleanMdmConfig,
+) {
+  const extensionMcpKey = `user-glean.glean-extension-${config.serverName}`;
+  const gleanMcpConfigured = clients.find(
+    (c) => c.url === config.url && c.key !== extensionMcpKey,
+  );
+  const extensionMcpIsRegistered = clients.find(
+    (c) => c.key === extensionMcpKey,
+  );
+  const gleanMcpIsReady = clients.find(
+    (c) => c.url === config.url && c.state.kind === "ready",
+  );
+
+  log.info(`gleanMcpConfigured: ${!!gleanMcpConfigured}`);
+  log.info(`extensionMcpIsRegistered: ${!!extensionMcpIsRegistered}`);
+  log.info(`gleanMcpIsReady: ${!!gleanMcpIsReady}`);
+
+  if (!gleanMcpConfigured && !extensionMcpIsRegistered) {
+    await registerGleanMcpServer(config);
+  } else if (gleanMcpConfigured && extensionMcpIsRegistered) {
+    log.info("Unregistering MCP server " + extensionMcpKey);
+    vscode.cursor.mcp.unregisterServer(config.serverName);
+  } else if (!gleanMcpIsReady) {
+    await showNotification();
+  }
+
+  state.lastKnownMcpClients = clients;
+}
+
+export async function activate(context: vscode.ExtensionContext) {
+  // Push log disposable first — LIFO order means it disposes last,
+  // keeping the log channel alive for other dispose calls.
+  context.subscriptions.push({ dispose: () => log.dispose() });
+
+  log.info(
+    `Glean version: ${context.extension.packageJSON.version} on Cursor version: ${vscode.version}`,
+  );
 
   if (!hasCursorMcpApi()) {
     log.warn("Cursor MCP extension API not available");
-    vscode.window.showWarningMessage(
-      "Glean MDM: This version of Cursor does not support the MCP extension API. Please update Cursor."
+    return;
+  }
+
+  const extensionUrl = vscode.workspace
+    .getConfiguration("glean")
+    .get<string>("mcpServerUrl", "");
+  const config = resolveConfig(extensionUrl, (msg) => log.info(msg));
+
+  if (!config) {
+    log.warn(
+      "No Glean MDM config found (checked extension setting, system file, and user file)",
     );
     return;
   }
 
-  const extensionUrl = vscode.workspace.getConfiguration("glean").get<string>("mcpServerUrl", "");
-  const config = resolveConfig(extensionUrl, (msg) => log.info(msg));
-  if (!config) {
-    log.warn("No Glean MDM config found (checked extension setting, system file, and user file)");
-    return;
-  }
-  initializeWhenReady(context, config);
+  const state: ExtensionState = { lastKnownMcpClients: [] };
+  context.subscriptions.push({
+    dispose: () => {
+      state.lastKnownMcpClients = [];
+    },
+  });
 
-  context.subscriptions.push(
-    { dispose: cleanup },
-    { dispose: stopSignInReminder },
-    { dispose: () => log.dispose() },
+  await monitorMcpState(context, state, config);
+}
+
+/**
+ * Shows a warning notification prompting the user to sign in to Glean,
+ * and opens the MCP settings if the sign-in button is clicked.
+ */
+async function showNotification() {
+  log.info("Showing the noficiation");
+  const action = await vscode.window.showWarningMessage(
+    signInMessage,
+    signInButton,
   );
+
+  if (action === signInButton) {
+    log.info("Sign in button clicked");
+    await vscode.commands.executeCommand("aiSettings.action.open.mcp");
+  } else {
+    log.info("Non-sign-in button clicked");
+  }
 }
 
 export function deactivate() {
-  log.info("Glean extension deactivating");
-  cleanup();
+  if (onDidChangeTimeout) {
+    clearTimeout(onDidChangeTimeout);
+    onDidChangeTimeout = null;
+  }
 }
 
+/**
+ * Checks whether the Cursor MCP API is available in the current environment.
+ */
 function hasCursorMcpApi(): boolean {
   return !!(vscode as any).cursor?.mcp?.registerServer;
 }
 
-async function initializeWhenReady(context: vscode.ExtensionContext, config: GleanMdmConfig) {
-  const lease = await waitForLease();
- 
-  if (!lease) {
-    log.warn("No MCP lease available, disabling Glean MDM");
-    return;
-  }
-
-  await registerServer(config);
-  await checkAuthAndPrompt(lease, monitoredClientKey);
-
-  if (typeof lease.onDidChange === "function") {
-    log.info("Watching MCP auth state via lease.onDidChange");
-    const disposable = lease.onDidChange(() => {
-      checkAuthAndPrompt(lease, monitoredClientKey);
-    });
-    if (disposable?.dispose) {
-      context.subscriptions.push(disposable);
-    }
-  }
-}
-
-async function registerServer(config: GleanMdmConfig) {
-  const ownClientKey = toLeaseClientKey(config.serverName);
-  const existingClients = await getLeaseClients();
-
-  if (existingClients.length > 0) {
-    log.info(`Found ${existingClients.length} existing MCP client(s):`);
-    for (const c of existingClients) {
-      log.info(`  [${c.clientKey}] url=${c.url ?? "(none)"} state=${c.state ?? "unknown"}`);
-    }
-  }
-
-  const duplicate = existingClients.find(
-    (c) => c.url === config.url && c.clientKey !== ownClientKey,
-  );
-
-  if (duplicate) {
-    log.info(
-      `Skipping registration: "${duplicate.clientKey}" already serves ${config.url} (state=${duplicate.state})`,
-    );
-    if (registeredServerName) {
-      log.info(`Unregistering own server "${registeredServerName}" in favor of duplicate`);
-      vscode.cursor.mcp.unregisterServer(registeredServerName);
-      registeredServerName = null;
-    }
-    monitoredClientKey = duplicate.clientKey;
-    if (duplicate.state === "requires_authentication") {
-      startSignInReminder();
-    }
-    return;
-  }
-
-  if (registeredServerName && registeredServerName !== config.serverName) {
-    log.info(`Server name changed from "${registeredServerName}" to "${config.serverName}", unregistering old server`);
-    vscode.cursor.mcp.unregisterServer(registeredServerName);
-  }
-
-  registeredServerName = config.serverName;
-  monitoredClientKey = ownClientKey;
-
+/**
+ * Registers the Glean MCP server with Cursor using the provided config.
+ */
+async function registerGleanMcpServer(config: GleanMdmConfig) {
+  log.info(`Registered MCP server "extension-${config.serverName}"`);
   await vscode.cursor.mcp.registerServer({
     name: config.serverName,
     server: {
@@ -113,18 +205,4 @@ async function registerServer(config: GleanMdmConfig) {
       },
     },
   });
-
-  log.info(`Registered MCP server "extension-${config.serverName}"`);
-}
-
-function cleanup() {
-  if (registeredServerName) {
-    try {
-      log.info(`Unregistering MCP server "${registeredServerName}"`);
-      vscode.cursor.mcp.unregisterServer(registeredServerName);
-    } catch (err) {
-      log.error(`Failed to unregister server: ${err}`);
-    }
-    registeredServerName = null;
-  }
 }
