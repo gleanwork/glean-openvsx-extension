@@ -16,9 +16,6 @@
   "categories": [
     "MCP"
   ],
-  "extensionDependencies": [
-    "anysphere.cursor-mcp"
-  ],
   "activationEvents": [
     "onStartupFinished"
   ],
