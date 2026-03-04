@@ -17,7 +17,7 @@ function getSystemConfigPath(): string {
       return path.join(
         process.env.PROGRAMDATA ?? "C:\\ProgramData",
         "Glean MDM",
-        "mcp-config.json"
+        "mcp-config.json",
       );
     default:
       return "/etc/glean_mdm/mcp-config.json";
@@ -71,7 +71,10 @@ export type LogFn = (message: string) => void;
  * 2. System-level config file (MDM-managed)
  * 3. User-level config file (~/.glean_mdm/mcp-config.json)
  */
-export function resolveConfig(extensionUrl?: string, logger?: LogFn): GleanMdmConfig | null {
+export function resolveConfig(
+  extensionUrl?: string,
+  logger?: LogFn,
+): GleanMdmConfig | null {
   const log = logger ?? (() => {});
 
   const trimmed = extensionUrl?.trim();
@@ -90,9 +93,13 @@ export function resolveConfig(extensionUrl?: string, logger?: LogFn): GleanMdmCo
   const systemConfig = configFromFile(systemPath);
   if (systemConfig) {
     if (!isValidUrl(systemConfig.url)) {
-      log(`System config (${systemPath}): invalid URL "${systemConfig.url}", skipping`);
+      log(
+        `System config (${systemPath}): invalid URL "${systemConfig.url}", skipping`,
+      );
     } else {
-      log(`System config (${systemPath}): serverName=${systemConfig.serverName}, url=${systemConfig.url}`);
+      log(
+        `System config (${systemPath}): serverName=${systemConfig.serverName}, url=${systemConfig.url}`,
+      );
       return systemConfig;
     }
   } else {
@@ -103,9 +110,13 @@ export function resolveConfig(extensionUrl?: string, logger?: LogFn): GleanMdmCo
   const userConfig = configFromFile(userPath);
   if (userConfig) {
     if (!isValidUrl(userConfig.url)) {
-      log(`User config (${userPath}): invalid URL "${userConfig.url}", skipping`);
+      log(
+        `User config (${userPath}): invalid URL "${userConfig.url}", skipping`,
+      );
     } else {
-      log(`User config (${userPath}): serverName=${userConfig.serverName}, url=${userConfig.url}`);
+      log(
+        `User config (${userPath}): serverName=${userConfig.serverName}, url=${userConfig.url}`,
+      );
       return userConfig;
     }
   } else {
@@ -131,4 +142,3 @@ export function getWatchablePath(): string | null {
 
   return null;
 }
-
