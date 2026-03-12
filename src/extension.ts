@@ -1,8 +1,10 @@
 import * as vscode from "vscode";
 
 import { resolveConfig } from "./config";
+import { detectIde } from "./ide-detect";
 import * as log from "./log";
 import type { GleanMdmConfig } from "./types";
+import { activateWindsurf } from "./windsurf";
 
 const signInMessage =
   "Search your company's knowledge without leaving your editor. Find docs, examples, and answers right where you work.";
@@ -127,12 +129,13 @@ export async function activate(context: vscode.ExtensionContext) {
   // keeping the log channel alive for other dispose calls.
   context.subscriptions.push({ dispose: () => log.dispose() });
 
+  const ide = detectIde();
   log.info(
-    `Glean version: ${context.extension.packageJSON.version} on Cursor version: ${vscode.version}`,
+    `Glean version: ${context.extension.packageJSON.version} on ${ide} ${vscode.version}`,
   );
 
-  if (!hasCursorMcpApi()) {
-    log.warn("Cursor MCP extension API not available");
+  if (ide === "unknown") {
+    log.info("Not running in Cursor or Windsurf, skipping activation");
     return;
   }
 
@@ -142,20 +145,21 @@ export async function activate(context: vscode.ExtensionContext) {
   const config = resolveConfig(extensionUrl, (msg) => log.info(msg));
 
   if (!config) {
-    log.warn(
-      "No Glean MDM config found (checked extension setting, system file, and user file)",
-    );
+    log.warn("No Glean MDM config found");
     return;
   }
 
-  const state: ExtensionState = { lastKnownMcpClients: [] };
-  context.subscriptions.push({
-    dispose: () => {
-      state.lastKnownMcpClients = [];
-    },
-  });
-
-  await monitorMcpState(context, state, config);
+  if (ide === "cursor") {
+    const state: ExtensionState = { lastKnownMcpClients: [] };
+    context.subscriptions.push({
+      dispose: () => {
+        state.lastKnownMcpClients = [];
+      },
+    });
+    await monitorMcpState(context, state, config);
+  } else if (ide === "windsurf") {
+    await activateWindsurf(context, config);
+  }
 }
 
 /**
@@ -182,13 +186,6 @@ export function deactivate() {
     clearTimeout(onDidChangeTimeout);
     onDidChangeTimeout = null;
   }
-}
-
-/**
- * Checks whether the Cursor MCP API is available in the current environment.
- */
-function hasCursorMcpApi(): boolean {
-  return !!(vscode as any).cursor?.mcp?.registerServer;
 }
 
 /**
