@@ -46,8 +46,11 @@ type LSConnection = {
 
 let signInNotificationVisible = false;
 
-// --- Entry point ---
-
+/**
+ * Entry point for Windsurf MCP integration. Ensures Glean is registered
+ * in the Windsurf MCP config file and starts polling the language server
+ * for MCP state changes.
+ */
 export async function activateWindsurf(
   context: vscode.ExtensionContext,
   config: GleanMdmConfig,
@@ -56,12 +59,17 @@ export async function activateWindsurf(
   monitorWindsurfMcpState(context, config);
 }
 
-// --- Config file management ---
-
+/** Returns the path to Windsurf's MCP config file. */
 function getMcpConfigPath(): string {
   return path.join(os.homedir(), ".codeium", "windsurf", "mcp_config.json");
 }
 
+/**
+ * Ensures Glean is registered in `~/.codeium/windsurf/mcp_config.json`.
+ * Reads the existing config (or creates a new one), checks for an existing
+ * entry with the same serverUrl to avoid duplicates, writes the entry if
+ * missing, and calls `windsurf.refreshMcpServers` to reload.
+ */
 async function registerGleanInConfig(config: GleanMdmConfig): Promise<void> {
   const configPath = getMcpConfigPath();
   let data: WindsurfMcpConfig;
@@ -106,11 +114,14 @@ async function registerGleanInConfig(config: GleanMdmConfig): Promise<void> {
   }
 }
 
-// --- Polling / monitoring ---
-
 const POLL_INTERVAL_MS = 15_000;
 const DISCOVERY_RETRY_DELAYS_MS = [0, 2_000, 4_000, 8_000, 16_000];
 
+/**
+ * Attempts to discover the Windsurf language server with exponential backoff
+ * retries (0s, 2s, 4s, 8s, 16s) to handle the startup race where the LS
+ * may not be running yet when the extension activates.
+ */
 async function discoverWithRetry(): Promise<LSConnection | null> {
   for (let i = 0; i < DISCOVERY_RETRY_DELAYS_MS.length; i++) {
     const delay = DISCOVERY_RETRY_DELAYS_MS[i];
@@ -128,6 +139,11 @@ async function discoverWithRetry(): Promise<LSConnection | null> {
   return null;
 }
 
+/**
+ * Starts a polling loop that checks the Windsurf LS for MCP server states
+ * every 15 seconds. Automatically re-discovers the LS connection on failure
+ * to handle LS restarts (new port and CSRF token each time).
+ */
 function monitorWindsurfMcpState(
   context: vscode.ExtensionContext,
   config: GleanMdmConfig,
@@ -167,8 +183,12 @@ function monitorWindsurfMcpState(
   });
 }
 
-// --- LS discovery (macOS) ---
-
+/**
+ * Discovers the Windsurf language server connection details on macOS.
+ * Finds the LS process via `pgrep`, extracts the CSRF token from the
+ * process environment via `ps eww`, and discovers the listening port
+ * via `lsof`.
+ */
 async function discoverLanguageServer(): Promise<LSConnection | null> {
   try {
     // Find PID
@@ -230,8 +250,10 @@ async function discoverLanguageServer(): Promise<LSConnection | null> {
   }
 }
 
-// --- ConnectRPC call ---
-
+/**
+ * Calls the Windsurf language server's ConnectRPC endpoint to retrieve
+ * the current state of all registered MCP servers.
+ */
 async function getMcpServerStates(
   conn: LSConnection,
 ): Promise<WindsurfMcpServerState[]> {
@@ -289,8 +311,12 @@ async function getMcpServerStates(
   return states;
 }
 
-// --- State change handling ---
-
+/**
+ * Processes MCP state changes for the Glean server. Finds the Glean entry
+ * by matching serverUrl or serverName, then takes action based on status:
+ * READY logs success, NEEDS_OAUTH shows a sign-in notification, ERROR logs
+ * the error, and PENDING is a no-op. If Glean is not found, re-registers it.
+ */
 function handleMcpStateChange(
   states: WindsurfMcpServerState[],
   config: GleanMdmConfig,
@@ -324,8 +350,12 @@ function handleMcpStateChange(
   }
 }
 
-// --- Notification ---
-
+/**
+ * Shows a warning notification prompting the user to sign in to Glean.
+ * Uses a de-dup flag to prevent stacking multiple notifications.
+ * Clicking "Sign in to Glean" triggers `windsurf.refreshMcpServers`
+ * which initiates the OAuth flow in the language server.
+ */
 function showSignInNotification() {
   if (signInNotificationVisible) {
     return;
