@@ -114,7 +114,7 @@ async function registerGleanInConfig(config: GleanMdmConfig): Promise<void> {
   }
 }
 
-const POLL_INTERVAL_MS = 15_000;
+const POLL_INTERVAL_MS = 30_000;
 const DISCOVERY_RETRY_DELAYS_MS = [0, 2_000, 4_000, 8_000, 16_000];
 
 /**
@@ -141,7 +141,7 @@ async function discoverWithRetry(): Promise<LSConnection | null> {
 
 /**
  * Starts a polling loop that checks the Windsurf LS for MCP server states
- * every 15 seconds. Automatically re-discovers the LS connection on failure
+ * every 30 seconds. Automatically re-discovers the LS connection on failure
  * to handle LS restarts (new port and CSRF token each time).
  */
 function monitorWindsurfMcpState(
