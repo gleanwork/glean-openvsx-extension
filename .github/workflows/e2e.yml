@@ -11,8 +11,8 @@ on:
 
 jobs:
   e2e:
-    runs-on: [self-hosted, macOS]
-    timeout-minutes: 15
+    runs-on: macos-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -20,6 +20,12 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
+      - name: Cache editor binaries
+        uses: actions/cache@v4
+        with:
+          path: /Applications/{Cursor,Windsurf,Antigravity}.app
+          key: editor-binaries-v1
 
       - name: Install editor binaries
         run: bash e2e/install-editors.sh
