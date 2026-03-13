@@ -1,8 +1,10 @@
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 # Downloads and installs editor binaries on macOS.
 # Idempotent: skips editors already installed in /Applications/.
+# Best-effort: continues past download failures so CI doesn't break
+# when a URL is stale. The test runner skips missing editors.
 # Usage: ./e2e/install-editors.sh [install_dir]
 
 INSTALL_DIR="${1:-/tmp/glean-e2e-editors}"
@@ -18,11 +20,20 @@ install_dmg_app() {
 
   echo "Downloading ${name}..."
   local dmg_path="${INSTALL_DIR}/${name}.dmg"
-  curl -fSL -o "$dmg_path" "$url"
+  if ! curl -fSL --connect-timeout 10 --max-time 300 -o "$dmg_path" "$url"; then
+    echo "WARNING: Failed to download ${name}, skipping"
+    rm -f "$dmg_path"
+    return 0
+  fi
 
   echo "Mounting and installing ${name}..."
   local mount_point
-  mount_point=$(hdiutil attach "$dmg_path" -nobrowse -quiet | tail -1 | awk '{print $NF}')
+  if ! mount_point=$(hdiutil attach "$dmg_path" -nobrowse -quiet | tail -1 | awk '{print $NF}'); then
+    echo "WARNING: Failed to mount ${name} DMG, skipping"
+    rm -f "$dmg_path"
+    return 0
+  fi
+
   cp -R "${mount_point}/${app_name}.app" /Applications/
   hdiutil detach "$mount_point" -quiet
   rm -f "$dmg_path"
