@@ -6,6 +6,8 @@ on:
       editors:
         description: 'Editors to test (comma-separated: cursor,windsurf,antigravity)'
         default: 'cursor,windsurf,antigravity'
+  pull_request:
+    branches: [main]
   push:
     tags: ['v*']
 
