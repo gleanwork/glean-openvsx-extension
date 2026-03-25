@@ -25,19 +25,19 @@ export async function activate(context: vscode.ExtensionContext) {
   const extensionUrl = vscode.workspace
     .getConfiguration("glean")
     .get<string>("mcpServerUrl", "");
-  const config = resolveConfig(extensionUrl, (msg) => log.info(msg));
+  const configs = resolveConfig(extensionUrl, (msg) => log.info(msg));
 
-  if (!config) {
+  if (!configs) {
     log.warn("No Glean MDM config found");
     return;
   }
 
   if (ide === "cursor") {
-    await activateCursor(context, config);
+    await activateCursor(context, configs);
   } else if (ide === "windsurf") {
-    await activateWindsurf(context, config);
+    await activateWindsurf(context, configs);
   } else if (ide === "antigravity") {
-    await activateAntigravity(context, config);
+    await activateAntigravity(context, configs);
   }
 }
 

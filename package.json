@@ -37,6 +37,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "package": "vsce package --out glean.vsix",
+    "build:install:open": "npm run package && cursor --install-extension glean.vsix && windsurf --install-extension glean.vsix && antigravity --install-extension glean.vsix && open -a Cursor && open -a Windsurf && open -a Antigravity",
     "test": "vitest run"
   },
   "devDependencies": {

@@ -64,7 +64,7 @@ let leaseHasChanged: boolean = false;
 async function monitorMcpState(
   context: vscode.ExtensionContext,
   state: ExtensionState,
-  config: GleanMdmConfig,
+  configs: GleanMdmConfig[],
 ) {
   const mcpExt = vscode.extensions.getExtension("anysphere.cursor-mcp");
   const { getMcpLease } = await (mcpExt as any).activate();
@@ -97,17 +97,19 @@ async function monitorMcpState(
         });
       }
 
-      await handleMcpStateChange(state, clientInfos, config);
+      await handleMcpStateChange(state, clientInfos, configs);
     }, DEBOUNCE_DELAY_MS);
   });
 
-  // Wait for 10 seconds to see if any MCP clients are found, and if not, register the Glean MCP server
+  // Wait for 10 seconds to see if any MCP clients are found, and if not, register the Glean MCP servers
   // In the case where no MCP clients have been added the lease.onDidChange callback will not be called
-  // so we go ahead and register the Glean MCP server to "manually" kick off the change process.
+  // so we go ahead and register the Glean MCP servers to "manually" kick off the change process.
   const timeoutHandle = setTimeout(async () => {
     if (!leaseHasChanged) {
-      log.info(`No initial MCP clients found, registering Glean MCP server`);
-      await registerGleanMcpServer(config);
+      log.info(`No initial MCP clients found, registering Glean MCP servers`);
+      for (const config of configs) {
+        await registerGleanMcpServer(config);
+      }
     }
   }, 10_000);
 
@@ -124,30 +126,32 @@ async function monitorMcpState(
 async function handleMcpStateChange(
   state: ExtensionState,
   clients: McpClientInfo[],
-  config: GleanMdmConfig,
+  configs: GleanMdmConfig[],
 ) {
-  const extensionMcpKey = `user-glean.glean-extension-${config.serverName}`;
-  const gleanMcpConfigured = clients.find(
-    (c) => c.url === config.url && c.key !== extensionMcpKey,
-  );
-  const extensionMcpIsRegistered = clients.find(
-    (c) => c.key === extensionMcpKey,
-  );
-  const gleanMcpIsReady = clients.find(
-    (c) => c.url === config.url && c.state.kind === "ready",
-  );
+  for (const config of configs) {
+    const extensionMcpKey = `user-glean.glean-extension-${config.serverName}`;
+    const gleanMcpConfigured = clients.find(
+      (c) => c.url === config.url && c.key !== extensionMcpKey,
+    );
+    const extensionMcpIsRegistered = clients.find(
+      (c) => c.key === extensionMcpKey,
+    );
+    const gleanMcpIsReady = clients.find(
+      (c) => c.url === config.url && c.state.kind === "ready",
+    );
 
-  log.info(`gleanMcpConfigured: ${!!gleanMcpConfigured}`);
-  log.info(`extensionMcpIsRegistered: ${!!extensionMcpIsRegistered}`);
-  log.info(`gleanMcpIsReady: ${!!gleanMcpIsReady}`);
+    log.info(`[${config.serverName}] gleanMcpConfigured: ${!!gleanMcpConfigured}`);
+    log.info(`[${config.serverName}] extensionMcpIsRegistered: ${!!extensionMcpIsRegistered}`);
+    log.info(`[${config.serverName}] gleanMcpIsReady: ${!!gleanMcpIsReady}`);
 
-  if (!gleanMcpConfigured && !extensionMcpIsRegistered) {
-    await registerGleanMcpServer(config);
-  } else if (gleanMcpConfigured && extensionMcpIsRegistered) {
-    log.info("Unregistering MCP server " + extensionMcpKey);
-    vscode.cursor.mcp.unregisterServer(config.serverName);
-  } else if (!gleanMcpIsReady) {
-    await showNotification();
+    if (!gleanMcpConfigured && !extensionMcpIsRegistered) {
+      await registerGleanMcpServer(config);
+    } else if (gleanMcpConfigured && extensionMcpIsRegistered) {
+      log.info("Unregistering MCP server " + extensionMcpKey);
+      vscode.cursor.mcp.unregisterServer(config.serverName);
+    } else if (!gleanMcpIsReady) {
+      await showNotification();
+    }
   }
 
   state.lastKnownMcpClients = clients;
@@ -190,7 +194,7 @@ async function registerGleanMcpServer(config: GleanMdmConfig) {
 
 export async function activateCursor(
   context: vscode.ExtensionContext,
-  config: GleanMdmConfig,
+  configs: GleanMdmConfig[],
 ) {
   const state: ExtensionState = { lastKnownMcpClients: [] };
   context.subscriptions.push({
@@ -198,7 +202,7 @@ export async function activateCursor(
       state.lastKnownMcpClients = [];
     },
   });
-  await monitorMcpState(context, state, config);
+  await monitorMcpState(context, state, configs);
 }
 
 export function deactivateCursor() {

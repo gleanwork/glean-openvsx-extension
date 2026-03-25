@@ -31,7 +31,7 @@ function getUserConfigPath(): string {
   return path.join(os.homedir(), ".glean_mdm", "mcp-config.json");
 }
 
-function readJsonFile(filePath: string): Record<string, unknown> | null {
+function readJsonFile(filePath: string): unknown {
   try {
     const content = fs.readFileSync(filePath, "utf-8");
     return JSON.parse(content);
@@ -49,18 +49,38 @@ function isValidUrl(url: string): boolean {
   }
 }
 
-function configFromFile(filePath: string): GleanMdmConfig | null {
+function configsFromFile(filePath: string, logger?: LogFn): GleanMdmConfig[] {
+  const log = logger ?? (() => {});
   const data = readJsonFile(filePath);
-  if (!data || typeof data.url !== "string" || !data.url) {
-    return null;
+  if (data === null || data === undefined) {
+    return [];
   }
-  return {
-    serverName:
-      typeof data.serverName === "string" && data.serverName
-        ? data.serverName
-        : DEFAULT_SERVER_NAME,
-    url: data.url,
-  };
+
+  const rawEntries: unknown[] = Array.isArray(data) ? data : [data];
+  const configs: GleanMdmConfig[] = [];
+
+  for (const entry of rawEntries) {
+    if (typeof entry !== "object" || entry === null) {
+      continue;
+    }
+    const obj = entry as Record<string, unknown>;
+    if (typeof obj.url !== "string" || !obj.url) {
+      continue;
+    }
+    if (!isValidUrl(obj.url)) {
+      log(`${filePath}: invalid URL "${obj.url}", skipping`);
+      continue;
+    }
+    configs.push({
+      serverName:
+        typeof obj.serverName === "string" && obj.serverName
+          ? obj.serverName
+          : DEFAULT_SERVER_NAME,
+      url: obj.url,
+    });
+  }
+
+  return configs;
 }
 
 export type LogFn = (message: string) => void;
@@ -70,11 +90,14 @@ export type LogFn = (message: string) => void;
  * 1. Extension setting (glean.mcpServerUrl)
  * 2. System-level config file (MDM-managed)
  * 3. User-level config file (~/.glean_mdm/mcp-config.json)
+ *
+ * Config files may contain a single object or an array of objects.
+ * Returns all valid entries from the highest-priority source, or null.
  */
 export function resolveConfig(
   extensionUrl?: string,
   logger?: LogFn,
-): GleanMdmConfig | null {
+): GleanMdmConfig[] | null {
   const log = logger ?? (() => {});
 
   const trimmed = extensionUrl?.trim();
@@ -83,42 +106,34 @@ export function resolveConfig(
       log(`Extension setting: invalid URL "${trimmed}", skipping`);
     } else {
       log(`Extension setting: url=${trimmed}`);
-      return { serverName: DEFAULT_SERVER_NAME, url: trimmed };
+      return [{ serverName: DEFAULT_SERVER_NAME, url: trimmed }];
     }
   } else {
     log("Extension setting: not configured");
   }
 
   const systemPath = getSystemConfigPath();
-  const systemConfig = configFromFile(systemPath);
-  if (systemConfig) {
-    if (!isValidUrl(systemConfig.url)) {
+  const systemConfigs = configsFromFile(systemPath, logger);
+  if (systemConfigs.length > 0) {
+    for (const c of systemConfigs) {
       log(
-        `System config (${systemPath}): invalid URL "${systemConfig.url}", skipping`,
+        `System config (${systemPath}): serverName=${c.serverName}, url=${c.url}`,
       );
-    } else {
-      log(
-        `System config (${systemPath}): serverName=${systemConfig.serverName}, url=${systemConfig.url}`,
-      );
-      return systemConfig;
     }
+    return systemConfigs;
   } else {
     log(`System config (${systemPath}): not found`);
   }
 
   const userPath = getUserConfigPath();
-  const userConfig = configFromFile(userPath);
-  if (userConfig) {
-    if (!isValidUrl(userConfig.url)) {
+  const userConfigs = configsFromFile(userPath, logger);
+  if (userConfigs.length > 0) {
+    for (const c of userConfigs) {
       log(
-        `User config (${userPath}): invalid URL "${userConfig.url}", skipping`,
+        `User config (${userPath}): serverName=${c.serverName}, url=${c.url}`,
       );
-    } else {
-      log(
-        `User config (${userPath}): serverName=${userConfig.serverName}, url=${userConfig.url}`,
-      );
-      return userConfig;
     }
+    return userConfigs;
   } else {
     log(`User config (${userPath}): not found`);
   }

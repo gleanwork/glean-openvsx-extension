@@ -50,10 +50,12 @@ let signInNotificationVisible = false;
  */
 export async function activateAntigravity(
   context: vscode.ExtensionContext,
-  config: GleanMdmConfig,
+  configs: GleanMdmConfig[],
 ) {
-  await registerGleanInConfig(config);
-  monitorAntigravityMcpState(context, config);
+  for (const config of configs) {
+    await registerGleanInConfig(config);
+  }
+  monitorAntigravityMcpState(context, configs);
 }
 
 /** Returns the path to Antigravity's MCP config file. */
@@ -137,7 +139,7 @@ async function discoverWithRetry(): Promise<LSConnection | null> {
  */
 function monitorAntigravityMcpState(
   context: vscode.ExtensionContext,
-  config: GleanMdmConfig,
+  configs: GleanMdmConfig[],
 ) {
   let connection: LSConnection | null = null;
   let intervalHandle: NodeJS.Timeout | null = null;
@@ -166,9 +168,12 @@ function monitorAntigravityMcpState(
     }
 
     try {
-      const states = await getMcpServerStates(connection);
-      const done = handleMcpStateChange(states, config, connection);
-      if (done) {
+      const conn = connection;
+      const states = await getMcpServerStates(conn);
+      const allDone = configs.every((config) =>
+        handleMcpStateChange(states, config, conn),
+      );
+      if (allDone) {
         stopPolling();
       }
     } catch (err) {
