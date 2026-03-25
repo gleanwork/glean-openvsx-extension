@@ -86,10 +86,10 @@ describe("resolveConfig()", () => {
       }),
     });
 
-    expect(resolveConfig()).toEqual({
+    expect(resolveConfig()).toEqual([{
       serverName: "system_server",
       url: "https://system.example.com/mcp",
-    });
+    }]);
   });
 
   it("falls back to user config when system config missing", () => {
@@ -100,10 +100,10 @@ describe("resolveConfig()", () => {
       }),
     });
 
-    expect(resolveConfig()).toEqual({
+    expect(resolveConfig()).toEqual([{
       serverName: "user_server",
       url: "https://user.example.com/mcp",
-    });
+    }]);
   });
 
   it("uses DEFAULT_SERVER_NAME when serverName missing from file", () => {
@@ -111,10 +111,10 @@ describe("resolveConfig()", () => {
       [SYSTEM_PATH]: JSON.stringify({ url: "https://example.com/mcp" }),
     });
 
-    expect(resolveConfig()).toEqual({
+    expect(resolveConfig()).toEqual([{
       serverName: DEFAULT_SERVER_NAME,
       url: "https://example.com/mcp",
-    });
+    }]);
   });
 
   it("returns null for file with missing url", () => {
@@ -151,10 +151,10 @@ describe("resolveConfig()", () => {
       }),
     });
 
-    expect(resolveConfig()).toEqual({
+    expect(resolveConfig()).toEqual([{
       serverName: "system_server",
       url: "https://system.example.com/mcp",
-    });
+    }]);
   });
 });
 
@@ -171,17 +171,17 @@ describe("resolveConfig() with extensionUrl", () => {
       }),
     });
 
-    expect(resolveConfig("https://extension.example.com/mcp")).toEqual({
+    expect(resolveConfig("https://extension.example.com/mcp")).toEqual([{
       serverName: DEFAULT_SERVER_NAME,
       url: "https://extension.example.com/mcp",
-    });
+    }]);
   });
 
   it("extension URL uses DEFAULT_SERVER_NAME", () => {
-    expect(resolveConfig("https://ext.example.com/mcp")).toEqual({
+    expect(resolveConfig("https://ext.example.com/mcp")).toEqual([{
       serverName: DEFAULT_SERVER_NAME,
       url: "https://ext.example.com/mcp",
-    });
+    }]);
   });
 
   it("falls through to file config when extensionUrl is undefined", () => {
@@ -192,10 +192,10 @@ describe("resolveConfig() with extensionUrl", () => {
       }),
     });
 
-    expect(resolveConfig(undefined)).toEqual({
+    expect(resolveConfig(undefined)).toEqual([{
       serverName: "system_server",
       url: "https://system.example.com/mcp",
-    });
+    }]);
   });
 
   it("falls through to file config when extensionUrl is empty string", () => {
@@ -206,10 +206,10 @@ describe("resolveConfig() with extensionUrl", () => {
       }),
     });
 
-    expect(resolveConfig("")).toEqual({
+    expect(resolveConfig("")).toEqual([{
       serverName: "user_server",
       url: "https://user.example.com/mcp",
-    });
+    }]);
   });
 
   it("falls through to file config when extensionUrl is whitespace-only", () => {
@@ -220,17 +220,17 @@ describe("resolveConfig() with extensionUrl", () => {
       }),
     });
 
-    expect(resolveConfig("   ")).toEqual({
+    expect(resolveConfig("   ")).toEqual([{
       serverName: "system_server",
       url: "https://system.example.com/mcp",
-    });
+    }]);
   });
 
   it("trims whitespace from extension URL", () => {
-    expect(resolveConfig("  https://ext.example.com/mcp  ")).toEqual({
+    expect(resolveConfig("  https://ext.example.com/mcp  ")).toEqual([{
       serverName: DEFAULT_SERVER_NAME,
       url: "https://ext.example.com/mcp",
-    });
+    }]);
   });
 });
 
@@ -243,10 +243,10 @@ describe("resolveConfig() URL validation", () => {
       }),
     });
 
-    expect(resolveConfig("not-a-url")).toEqual({
+    expect(resolveConfig("not-a-url")).toEqual([{
       serverName: "system_server",
       url: "https://system.example.com/mcp",
-    });
+    }]);
   });
 
   it("skips invalid system config URL and falls through to user config", () => {
@@ -261,10 +261,10 @@ describe("resolveConfig() URL validation", () => {
       }),
     });
 
-    expect(resolveConfig()).toEqual({
+    expect(resolveConfig()).toEqual([{
       serverName: "user_server",
       url: "https://user.example.com/mcp",
-    });
+    }]);
   });
 
   it("skips invalid user config URL and returns null", () => {
@@ -297,8 +297,105 @@ describe("resolveConfig() URL validation", () => {
 
     expect(messages).toEqual([
       'Extension setting: invalid URL "also-bad", skipping',
-      `System config (${SYSTEM_PATH}): invalid URL "bad-url", skipping`,
+      `${SYSTEM_PATH}: invalid URL "bad-url", skipping`,
+      `System config (${SYSTEM_PATH}): not found`,
       `User config (${USER_PATH}): not found`,
+    ]);
+  });
+});
+
+describe("resolveConfig() with array config format", () => {
+  it("returns all valid entries from array config", () => {
+    stubFileContents({
+      [SYSTEM_PATH]: JSON.stringify([
+        { serverName: "server_a", url: "https://a.example.com/mcp" },
+        { serverName: "server_b", url: "https://b.example.com/mcp" },
+      ]),
+    });
+
+    expect(resolveConfig()).toEqual([
+      { serverName: "server_a", url: "https://a.example.com/mcp" },
+      { serverName: "server_b", url: "https://b.example.com/mcp" },
+    ]);
+  });
+
+  it("skips invalid entries in array and returns valid ones", () => {
+    stubFileContents({
+      [SYSTEM_PATH]: JSON.stringify([
+        { serverName: "good", url: "https://good.example.com/mcp" },
+        { serverName: "bad", url: "not-a-url" },
+        { url: "https://no-name.example.com/mcp" },
+      ]),
+    });
+
+    expect(resolveConfig()).toEqual([
+      { serverName: "good", url: "https://good.example.com/mcp" },
+      { serverName: DEFAULT_SERVER_NAME, url: "https://no-name.example.com/mcp" },
+    ]);
+  });
+
+  it("skips entries with missing url in array", () => {
+    stubFileContents({
+      [SYSTEM_PATH]: JSON.stringify([
+        { serverName: "no-url" },
+        { serverName: "has-url", url: "https://valid.example.com/mcp" },
+      ]),
+    });
+
+    expect(resolveConfig()).toEqual([
+      { serverName: "has-url", url: "https://valid.example.com/mcp" },
+    ]);
+  });
+
+  it("falls through when array has no valid entries", () => {
+    stubFileContents({
+      [SYSTEM_PATH]: JSON.stringify([
+        { serverName: "bad", url: "not-valid" },
+      ]),
+      [USER_PATH]: JSON.stringify({
+        serverName: "user",
+        url: "https://user.example.com/mcp",
+      }),
+    });
+
+    expect(resolveConfig()).toEqual([
+      { serverName: "user", url: "https://user.example.com/mcp" },
+    ]);
+  });
+
+  it("returns null when empty array and no other sources", () => {
+    stubFileContents({
+      [SYSTEM_PATH]: JSON.stringify([]),
+    });
+
+    expect(resolveConfig()).toBeNull();
+  });
+
+  it("applies default serverName per entry in array", () => {
+    stubFileContents({
+      [SYSTEM_PATH]: JSON.stringify([
+        { url: "https://a.example.com/mcp" },
+        { serverName: "named", url: "https://b.example.com/mcp" },
+        { serverName: "", url: "https://c.example.com/mcp" },
+      ]),
+    });
+
+    expect(resolveConfig()).toEqual([
+      { serverName: DEFAULT_SERVER_NAME, url: "https://a.example.com/mcp" },
+      { serverName: "named", url: "https://b.example.com/mcp" },
+      { serverName: DEFAULT_SERVER_NAME, url: "https://c.example.com/mcp" },
+    ]);
+  });
+
+  it("single-element array works like single object", () => {
+    stubFileContents({
+      [SYSTEM_PATH]: JSON.stringify([
+        { serverName: "solo", url: "https://solo.example.com/mcp" },
+      ]),
+    });
+
+    expect(resolveConfig()).toEqual([
+      { serverName: "solo", url: "https://solo.example.com/mcp" },
     ]);
   });
 });

@@ -50,10 +50,12 @@ let signInNotificationVisible = false;
  */
 export async function activateWindsurf(
   context: vscode.ExtensionContext,
-  config: GleanMdmConfig,
+  configs: GleanMdmConfig[],
 ) {
-  await registerGleanInConfig(config);
-  monitorWindsurfMcpState(context, config);
+  for (const config of configs) {
+    await registerGleanInConfig(config);
+  }
+  monitorWindsurfMcpState(context, configs);
 }
 
 /** Returns the path to Windsurf's MCP config file. */
@@ -144,7 +146,7 @@ async function discoverWithRetry(): Promise<LSConnection | null> {
  */
 function monitorWindsurfMcpState(
   context: vscode.ExtensionContext,
-  config: GleanMdmConfig,
+  configs: GleanMdmConfig[],
 ) {
   let connection: LSConnection | null = null;
   let intervalHandle: NodeJS.Timeout | null = null;
@@ -174,8 +176,10 @@ function monitorWindsurfMcpState(
 
     try {
       const states = await getMcpServerStates(connection);
-      const done = handleMcpStateChange(states, config);
-      if (done) {
+      const allDone = configs.every((config) =>
+        handleMcpStateChange(states, config),
+      );
+      if (allDone) {
         stopPolling();
       }
     } catch (err) {
