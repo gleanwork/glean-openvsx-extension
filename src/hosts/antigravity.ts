@@ -97,7 +97,7 @@ async function registerGleanInConfig(config: GleanMdmConfig): Promise<void> {
 
   data.mcpServers[config.serverName] = {
     serverUrl: config.url,
-    headers: { "X-Glean-Metadata": "MDM" },
+    headers: { "X-Glean-Metadata": "mdm" },
   };
 
   // Ensure parent directory exists

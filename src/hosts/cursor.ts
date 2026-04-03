@@ -186,7 +186,7 @@ async function registerGleanMcpServer(config: GleanMdmConfig) {
     server: {
       url: config.url,
       headers: {
-        "X-Glean-Metadata": "MDM",
+        "X-Glean-Metadata": "mdm",
       },
     },
   });
